@@ -1,6 +1,6 @@
 streamlit
 PyPDF2
-torch
+torch==2.1.0+cpu  # Ensures Streamlit Cloud doesn't install GPU/CUDA dependencies
 transformers
 sentencepiece
 numpy
