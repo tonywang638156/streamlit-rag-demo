@@ -185,7 +185,7 @@ def main():
 
     if pdf_text:
         if st.button("Process PDF and Build index"):
-            chunks = create_chunks(pdf_text, chunk_size=800, chunk_overlap=100)
+            chunks = create_chunks(pdf_text, chunk_size=500, chunk_overlap=80)
             st.session_state['indexer'] = PDFIndexer(st.session_state['embedding_model'])
             st.session_state['indexer'].index_chunks(chunks)
             st.success("Index built successfully!")
