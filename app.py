@@ -148,14 +148,14 @@ class SimpleGenerator:
             prompt,
             return_tensors='pt',
             truncation=True,
-            max_length=512
+            max_length=256
         )
         # Move inputs to device
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
         prompt_length = inputs['input_ids'].shape[1]
 
         # Compute total max length (prompt + new tokens), capped at 512 tokens
-        total_length = min(prompt_length + max_new_tokens, 1024)
+        total_length = min(prompt_length + max_new_tokens, 512)
 
         # Print debugging info (optional)
         print(f"Prompt length: {prompt_length}, Total max length for generation: {total_length}")
@@ -180,6 +180,50 @@ class SimpleGenerator:
 
         return final_answer
 
+def evaluate_with_judgement(queries):
+    """
+    Evaluate the RAG system by showing for each query:
+      - The retrieved text chunks.
+      - The final generated answer.
+    Allows a human judge to mark whether the answer is helpful.
+    
+    Returns a list of dictionaries containing the query, retrieved chunks,
+    generated answer, and the human judgement.
+    """
+    results = []
+    # Ensure that the index and generator are available
+    if 'indexer' not in st.session_state or st.session_state['indexer'] is None:
+        st.error("Please process the PDF and build the index first!")
+        return results
+    if 'generator_model' not in st.session_state:
+        st.session_state['generator_model'] = SimpleGenerator("facebook/opt-350m")
+    
+    for query in queries:
+        st.markdown(f"### Query: {query}")
+        
+        # Retrieve the top-k chunks
+        retrieved = st.session_state['indexer'].retrieve(query, top_k=3)
+        retrieved_chunks = [item[0] for item in retrieved]
+        
+        st.markdown("**Retrieved Excerpts:**")
+        for idx, chunk in enumerate(retrieved_chunks, start=1):
+            st.markdown(f"**Chunk {idx}:** {chunk}")
+        
+        # Generate answer using the retrieved context
+        generated_answer = st.session_state['generator_model'].generate_answer(query, retrieved_chunks)
+        st.markdown("**Generated Answer:**")
+        st.markdown(generated_answer)
+        
+        # Provide a human judgement option
+        judgement = st.radio("Is this answer helpful?", ("Yes", "No"), key=query)
+        results.append({
+            "query": query,
+            "retrieved_chunks": retrieved_chunks,
+            "generated_answer": generated_answer,
+            "judgement": judgement,
+        })
+        st.write("---")
+    return results
 
 
 
@@ -226,6 +270,22 @@ def main():
                 user_query, retrieved_chunks
             )
             st.markdown("**Answer:** " + answer)
+    
+    # 4) Performance Evaluation with Human Judgement
+    st.header("Performance Evaluation (Human Judgement)")
+
+    # Define some test queries
+    test_queries = [
+        "What is distillation?",
+        "How does DeepSeek-R1 improve reasoning?",
+        "What are the main contributions of DeepSeek-R1?"
+    ]
+
+    if st.button("Evaluate Performance"):
+        evaluation_results = evaluate_with_judgement(test_queries)
+        st.write("Evaluation Results:")
+        st.json(evaluation_results)
+
 
 if __name__ == "__main__":
     main()
